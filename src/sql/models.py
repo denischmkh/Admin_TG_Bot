@@ -8,9 +8,10 @@ from sqlalchemy import Column, UUID, String, Integer, DATETIME, TIMESTAMP
 class Chat(Base):
     __tablename__ = 'chat'
     id = Column(UUID, primary_key=True, index=True, default=uuid.uuid4, nullable=False)
-    owner = Column(String, nullable=False)
-    member = Column(String, nullable=False)
-    ticket = Column(Integer, nullable=False)
+    owner = Column(Integer, nullable=False)
+    member = Column(Integer, nullable=True)
+    ticket = Column(Integer, nullable=True)
+
 
 class Ticket(Base):
     __tablename__ = "ticket"

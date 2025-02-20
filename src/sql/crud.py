@@ -33,18 +33,20 @@ class DBManager:
     @classmethod
     async def close_ticket(cls, user_id: int) -> str | None:
         exists_ticket = await cls.check_ticket_exists(user_id)
-        exists_chat = await cls.find_current_chat(user_id)
-        if not exists_ticket and not exists_chat:
-            return 'Ticket not found!'
-        if exists_chat:
-            await bot.send_message(chat_id=exists_chat.owner, text='Чат закрыт❌')
+        if exists_ticket:
+            async with get_session() as session:
+                await session.execute(_sql.delete(Ticket).where(Ticket.member == user_id))
+                await session.commit()
+                logging.info(f'Ticket: {exists_ticket} was deleted')
+        else:
+            exists_chat = await cls.get_chat(user_id)
+            if not exists_chat:
+                return 'Request invalid'
             await cls.close_chat(exists_chat.owner)
-            return str(exists_chat.ticket)
-        async with get_session() as session:
-            await session.execute(_sql.delete(Ticket).where(Ticket.member == user_id))
-            await session.commit()
-            logging.info(f'Ticket: {exists_ticket} was deleted')
-        return
+            await cls.create_chat(exists_chat.owner)
+            await bot.send_message(chat_id=exists_chat.owner, text='Чат закрыт пользователем')
+
+
 
     @classmethod
     async def check_chat_exists(cls, owner_id: int) -> Chat | None:
@@ -90,6 +92,8 @@ class DBManager:
             result = await session.execute(_sql.select(Ticket))
             tickets = result.scalars().all()
             if not tickets:
+                await cls.close_chat(exist_chat.owner)
+                await cls.create_chat(exist_chat.owner)
                 return 'No tickets!'
             sorted_tickets: list[Ticket] = sorted(tickets, key=lambda ticket: ticket.created)
             oldest_ticket = sorted_tickets[0]
@@ -105,7 +109,7 @@ class DBManager:
         async with get_session() as session:
             result = await session.execute(_sql.select(Chat).where(_sql.or_(Chat.owner == user_id, Chat.member == user_id)))
             chat = result.scalars().first()
-            if not chat.member or not chat.owner:
+            if not chat.owner:
                 return None
             return chat
 
